@@ -38,12 +38,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/staging-coordinator.git"
+    "url": "git+https://github.com/bun913/staging-coordinator.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/staging-coordinator/issues"
+    "url": "https://github.com/bun913/staging-coordinator/issues"
   },
-  "homepage": "https://github.com/yourusername/staging-coordinator#readme",
+  "homepage": "https://github.com/bun913/staging-coordinator#readme",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
