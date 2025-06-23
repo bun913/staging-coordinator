@@ -1,54 +1,79 @@
 # Staging Coordinator
 
-A CLI tool to coordinate staging environment releases with Slack approval workflow.
+A CLI tool to coordinate staging environment releases through Slack approval workflow. When someone tries to deploy to a staging environment, this tool checks if the environment is currently in use and requests approval from the person in charge via Slack.
 
-## Overview
+## Features
 
-Staging Coordinator helps prevent release conflicts in staging environments by:
-- Checking Google Sheets for scheduled environment usage
-- Sending Slack notifications to stakeholders when conflicts are detected
-- Requiring approval via Slack reactions before allowing deployments to proceed
-- Following an availability-first policy (proceed if systems are unavailable)
+- 🔍 Checks Google Sheets for scheduled staging environment usage
+- 💬 Sends Slack notifications to request approval for releases
+- ✅ Waits for approval/rejection via Slack reactions
+- 🚦 Prevents accidental deployments during scheduled usage times
+- 🤖 CI/CD friendly with environment variable support
+- 📦 Available as npm package for easy integration
+
+## Prerequisites
+
+- Node.js >= 18.0.0
+- Google Sheets API access (Service Account)
+- Slack Bot with necessary permissions
+- A Google Spreadsheet with schedule data
 
 ## Installation
 
+### Quick Start (Recommended)
+
+Use `npx` to run without installation:
+
 ```bash
-npm install
-npm run build
+npx staging-coordinator <product-name> <environment-name>
 ```
 
-## Quick Start
+### Global Installation
 
 ```bash
-# Basic usage with .env file
-node dist/cli/index.js my-app staging
+npm install -g staging-coordinator
+```
 
-# With CLI arguments
-node dist/cli/index.js my-app staging \
+### Project Installation
+
+```bash
+npm install --save-dev staging-coordinator
+```
+
+## Usage
+
+### Basic Usage
+
+```bash
+# Using npx (no installation required)
+npx staging-coordinator my-app staging
+
+# Using globally installed command
+staging-coordinator my-app staging
+
+# Using in npm scripts
+"scripts": {
+  "deploy:staging": "staging-coordinator my-app staging && npm run deploy"
+}
+```
+
+### With Options
+
+```bash
+# With custom timeout
+npx staging-coordinator my-app staging --wait-minutes 5
+
+# With CI/CD (prevent self-approval)
+npx staging-coordinator my-app staging --requester-user-id $GITHUB_ACTOR
+
+# With all options via CLI
+npx staging-coordinator my-app staging \
   --slack-channel-id C1234567890 \
   --slack-token xoxb-your-token \
   --spreadsheet-id 1ABC123 \
   --sheets-credentials ./credentials.json
-
-# CI/CD usage (with requester ID for self-approval prevention)
-node dist/cli/index.js my-app staging --requester-user-id $GITHUB_ACTOR
 ```
 
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run tests in watch mode
-npm run test:watch
-
-# Build
-npm run build
-
-# Run locally
-npm run start -- check --env=staging --service=test
-```
 
 ## Configuration
 
@@ -178,9 +203,13 @@ Spreadsheet ID is `1ABCDEFGHijklmnopqrstuvwxyz123456789`
 ```yaml
 - name: Check staging release approval
   run: |
-    NODE_TLS_REJECT_UNAUTHORIZED=0 \
-    node dist/cli/index.js ${{ github.event.repository.name }} staging \
+    npx staging-coordinator@latest ${{ github.event.repository.name }} staging \
       --requester-user-id ${{ github.actor }}
+  env:
+    SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+    SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+    GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+    GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 ```
 
 #### CircleCI
@@ -188,21 +217,27 @@ Spreadsheet ID is `1ABCDEFGHijklmnopqrstuvwxyz123456789`
 - run:
     name: Check staging release approval
     command: |
-      NODE_TLS_REJECT_UNAUTHORIZED=0 \
-      node dist/cli/index.js ${CIRCLE_PROJECT_REPONAME} staging \
+      npx staging-coordinator@latest ${CIRCLE_PROJECT_REPONAME} staging \
         --requester-user-id ${CIRCLE_USERNAME}
+```
+
+#### GitLab CI
+```yaml
+check-staging:
+  script:
+    - npx staging-coordinator@latest $CI_PROJECT_NAME staging --requester-user-id $GITLAB_USER_LOGIN
 ```
 
 ### Manual Release Check
 ```bash
 # Check if my-app can be released to staging
-node dist/cli/index.js my-app staging
+npx staging-coordinator my-app staging
 
-# With custom timeout
-node dist/cli/index.js my-app staging --wait-minutes 5
+# With custom timeout (5 minutes)
+npx staging-coordinator my-app staging --wait-minutes 5
 
 # With different reactions
-node dist/cli/index.js my-app staging \
+npx staging-coordinator my-app staging \
   --approve-reaction thumbsup \
   --reject-reaction thumbsdown
 ```
@@ -254,9 +289,16 @@ Ensure date format in spreadsheet is: `YYYY/MM/DD HH:MM:SS`
 
 ### Debug Mode
 
-Enable verbose logging by setting:
+Enable verbose logging:
 ```bash
-DEBUG=* node dist/cli/index.js my-app staging
+DEBUG=* npx staging-coordinator my-app staging
+```
+
+### Corporate Proxy Environments
+
+For environments with self-signed certificates:
+```bash
+NODE_TLS_REJECT_UNAUTHORIZED=0 npx staging-coordinator my-app staging
 ```
 
 ## Development
