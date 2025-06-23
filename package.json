@@ -1,6 +1,6 @@
 {
   "name": "staging-coordinator",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "A CLI tool to coordinate staging environment releases with Slack approval workflow",
   "main": "dist/cli/index.js",
   "bin": {
