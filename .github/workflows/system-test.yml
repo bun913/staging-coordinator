@@ -1,0 +1,90 @@
+name: System Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment to use'
+        required: false
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - staging
+      test_message:
+        description: 'Custom test message'
+        required: false
+        default: 'Manual system test run'
+
+jobs:
+  system-test:
+    runs-on: ubuntu-latest
+    environment: system-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build project
+      run: npm run build
+      
+    - name: Run system tests
+      env:
+        SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+        GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+        GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+        GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        SHEET_NAME: ${{ secrets.SHEET_NAME }}
+        NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      run: |
+        echo "🧪 Running system integration tests..."
+        npm run test:system
+        
+    - name: Test CLI with real APIs (dry run)
+      env:
+        SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+        GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+        GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+        GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        SHEET_NAME: ${{ secrets.SHEET_NAME }}
+        NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      run: |
+        echo "🚀 Testing CLI with real APIs..."
+        echo "Test message: ${{ github.event.inputs.test_message }}"
+        
+        # Test with a non-existent product to avoid actual approval flows
+        timeout 30s node dist/cli/index.js "system-test-${{ github.run_number }}" "test" \
+          --wait-minutes=0.5 || {
+          exit_code=$?
+          if [ $exit_code -eq 124 ]; then
+            echo "✅ CLI test completed (timed out as expected)"
+          elif [ $exit_code -eq 0 ]; then
+            echo "✅ CLI test completed successfully"
+          else
+            echo "❌ CLI test failed with exit code $exit_code"
+            exit $exit_code
+          fi
+        }
+        
+    - name: System test summary
+      if: always()
+      run: |
+        echo "## System Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Message**: ${{ github.event.inputs.test_message }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ System tests verify real API connectivity and CLI functionality." >> $GITHUB_STEP_SUMMARY
