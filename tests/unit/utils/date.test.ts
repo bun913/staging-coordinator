@@ -61,8 +61,7 @@ describe('Basic Date Operations', () => {
         const utcNow = new Date();
         const diffInHours = (result.value.getTime() - utcNow.getTime()) / (1000 * 60 * 60);
 
-        // Asia/Tokyoは常にUTC+9なので、正確に9時間の差であることを確認
-        expect(diffInHours).toBeCloseTo(9, 1); // 小数点第1位まで近似
+        expect(diffInHours).toBeCloseTo(9, 1);
       }
     });
   });
