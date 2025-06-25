@@ -177,7 +177,10 @@ REQUESTER_USER_ID=your-github-username  # For CI/CD
 WAIT_MINUTES=20
 APPROVE_REACTION=+1
 REJECT_REACTION=-1
-TIMEZONE=Asia/Tokyo
+
+# IMPORTANT: Timezone Configuration
+TIMEZONE=UTC  # REQUIRED: Must match the timezone used in your Google Spreadsheet
+# Examples: UTC, Asia/Tokyo, America/New_York, Europe/London
 ```
 
 ### 4. Getting IDs
@@ -204,12 +207,14 @@ Spreadsheet ID is `1ABCDEFGHijklmnopqrstuvwxyz123456789`
 - name: Check staging release approval
   run: |
     npx staging-coordinator@latest ${{ github.event.repository.name }} staging \
-      --requester-user-id ${{ github.actor }}
+      --requester-user-id ${{ github.actor }} \
+      --timezone UTC
   env:
     SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
     GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
     GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+    TIMEZONE: UTC  # Ensure this matches your spreadsheet timezone
 ```
 
 #### CircleCI
@@ -218,36 +223,65 @@ Spreadsheet ID is `1ABCDEFGHijklmnopqrstuvwxyz123456789`
     name: Check staging release approval
     command: |
       npx staging-coordinator@latest ${CIRCLE_PROJECT_REPONAME} staging \
-        --requester-user-id ${CIRCLE_USERNAME}
+        --requester-user-id ${CIRCLE_USERNAME} \
+        --timezone UTC
+    environment:
+      TIMEZONE: UTC
 ```
 
 #### GitLab CI
 ```yaml
 check-staging:
   script:
-    - npx staging-coordinator@latest $CI_PROJECT_NAME staging --requester-user-id $GITLAB_USER_LOGIN
+    - npx staging-coordinator@latest $CI_PROJECT_NAME staging --requester-user-id $GITLAB_USER_LOGIN --timezone UTC
+  variables:
+    TIMEZONE: UTC
 ```
 
 ### Manual Release Check
 ```bash
-# Check if my-app can be released to staging
-npx staging-coordinator my-app staging
+# Check if my-app can be released to staging (with UTC timezone)
+npx staging-coordinator my-app staging --timezone UTC
 
 # With custom timeout (5 minutes)
-npx staging-coordinator my-app staging --wait-minutes 5
+npx staging-coordinator my-app staging --timezone UTC --wait-minutes 5
 
-# With different reactions
+# With different reactions and JST timezone
 npx staging-coordinator my-app staging \
+  --timezone Asia/Tokyo \
   --approve-reaction thumbsup \
   --reject-reaction thumbsdown
+```
+
+## Important Notes
+
+### Timezone Configuration
+
+**🚨 CRITICAL**: The `TIMEZONE` parameter is **REQUIRED** and must match the timezone used in your Google Spreadsheet.
+
+- **Spreadsheet times**: When you enter `2025/06/23 14:00:00` in your spreadsheet, this tool interprets it according to the `TIMEZONE` setting
+- **Mismatch consequences**: Wrong timezone settings will cause incorrect schedule matching, potentially allowing releases during restricted times
+- **CI/CD environments**: Most CI/CD systems run in UTC, so ensure your spreadsheet times and timezone setting are aligned
+
+**Examples:**
+```bash
+# If your spreadsheet uses JST times
+npx staging-coordinator my-app staging --timezone Asia/Tokyo
+
+# If your spreadsheet uses UTC times (recommended for global teams)
+npx staging-coordinator my-app staging --timezone UTC
+
+# If your spreadsheet uses EST times
+npx staging-coordinator my-app staging --timezone America/New_York
 ```
 
 ## How It Works
 
 1. **Schedule Check**: Reads Google Sheets for active schedules matching product and environment
-2. **Conflict Detection**: If schedules found, sends Slack notification to stakeholders
-3. **Approval Process**: Waits for ✅ (approve) or ❌ (reject) reactions
-4. **Decision**: 
+2. **Timezone Conversion**: Interprets spreadsheet times using the specified timezone
+3. **Conflict Detection**: If schedules found, sends Slack notification to stakeholders
+4. **Approval Process**: Waits for ✅ (approve) or ❌ (reject) reactions
+5. **Decision**: 
    - **Approved**: Exit code 0, deployment proceeds
    - **Rejected**: Exit code 1, deployment stops
    - **Timeout**: Exit code 1, deployment stops
@@ -286,6 +320,20 @@ Ensure date format in spreadsheet is: `YYYY/MM/DD HH:MM:SS`
 ❌ 2025-06-23 12:00:00
 ❌ 23/06/2025 12:00:00
 ```
+
+#### Timezone Mismatch
+- **Problem**: Schedules not detected or detected incorrectly
+- **Solution**: Ensure `TIMEZONE` parameter matches your spreadsheet timezone
+- **Example**: If spreadsheet uses JST times, use `--timezone Asia/Tokyo`
+
+#### Schedule Times Not Matching
+- **Problem**: Tool doesn't detect active schedules during expected times
+- **Common cause**: Timezone configuration mismatch
+- **Debug**: Check if current time in specified timezone matches your expectation:
+  ```bash
+  # Check current time in specified timezone
+  node -e "console.log(new Date().toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}))"
+  ```
 
 ### Debug Mode
 
