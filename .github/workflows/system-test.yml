@@ -2,19 +2,6 @@ name: System Test
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Test environment to use'
-        required: false
-        default: 'test'
-        type: choice
-        options:
-          - test
-          - staging
-      test_message:
-        description: 'Custom test message'
-        required: false
-        default: 'Manual system test run'
 
 jobs:
   system-test:
