@@ -37,6 +37,8 @@ describe('Release Checker Service', () => {
     slack: {
       postMessage: vi.fn(),
       getReactions: vi.fn(),
+      postThreadMessage: vi.fn(),
+      getUserInfo: vi.fn(),
     } as unknown as SlackClient,
   });
 
@@ -147,6 +149,8 @@ describe('Release Checker Service', () => {
           value: { channel: 'C123', timestamp: '1234567890.123' },
         }),
         getReactions: vi.fn(),
+        postThreadMessage: vi.fn(),
+        getUserInfo: vi.fn(),
       } as unknown as SlackClient;
 
       const result = await requestApproval(schedules, config, mockSlack, 'C123');
@@ -180,6 +184,8 @@ describe('Release Checker Service', () => {
           error: new Error('Slack API error'),
         }),
         getReactions: vi.fn(),
+        postThreadMessage: vi.fn(),
+        getUserInfo: vi.fn(),
       } as unknown as SlackClient;
 
       const result = await requestApproval(schedules, config, mockSlack, 'C123');
@@ -195,6 +201,14 @@ describe('Release Checker Service', () => {
         getReactions: vi.fn().mockResolvedValue({
           ok: true,
           value: [{ name: 'ok', count: 1, users: ['U123'] }],
+        }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { id: 'U123', name: 'Test User' },
         }),
       } as unknown as SlackClient;
 
@@ -219,6 +233,14 @@ describe('Release Checker Service', () => {
           ok: true,
           value: [{ name: 'ok', count: 1, users: ['U123'] }],
         }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { id: 'U123', name: 'Test User' },
+        }),
       } as unknown as SlackClient;
 
       const result = await waitForApproval(
@@ -241,6 +263,14 @@ describe('Release Checker Service', () => {
         getReactions: vi.fn().mockResolvedValue({
           ok: true,
           value: [{ name: '-1', count: 1, users: ['U123'] }],
+        }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { id: 'U123', name: 'Test User' },
         }),
       } as unknown as SlackClient;
 
@@ -265,6 +295,8 @@ describe('Release Checker Service', () => {
           ok: true,
           value: [],
         }),
+        postThreadMessage: vi.fn(),
+        getUserInfo: vi.fn(),
       } as unknown as SlackClient;
 
       const result = await waitForApproval(
@@ -279,6 +311,88 @@ describe('Release Checker Service', () => {
       );
 
       expect(result.status).toBe('timeout');
+    });
+
+    it('waitForApproval - when approval reaction found - posts thread message with approver name', async () => {
+      const mockSlack = {
+        postMessage: vi.fn(),
+        getReactions: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [{ name: 'ok', count: 1, users: ['U123'] }],
+        }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { id: 'U123', name: 'Test User' },
+        }),
+      } as unknown as SlackClient;
+
+      const result = await waitForApproval(
+        mockSlack,
+        'C123',
+        '1234567890.123',
+        ['U999'], // exclude requester
+        'ok',
+        '-1',
+        0.1,
+        10
+      );
+
+      expect(result.status).toBe('approved');
+
+      // Verify getUserInfo was called with correct user ID
+      expect(mockSlack.getUserInfo).toHaveBeenCalledWith('U123');
+
+      // Verify postThreadMessage was called with correct parameters
+      expect(mockSlack.postThreadMessage).toHaveBeenCalledWith(
+        'C123',
+        '1234567890.123',
+        expect.stringMatching(/✅.*<@U123>.*承認しました/)
+      );
+    });
+
+    it('waitForApproval - when rejection reaction found - posts thread message with rejector name', async () => {
+      const mockSlack = {
+        postMessage: vi.fn(),
+        getReactions: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [{ name: '-1', count: 1, users: ['U456'] }],
+        }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { id: 'U456', name: 'Another User' },
+        }),
+      } as unknown as SlackClient;
+
+      const result = await waitForApproval(
+        mockSlack,
+        'C123',
+        '1234567890.123',
+        ['U999'],
+        'ok',
+        '-1',
+        0.1,
+        10
+      );
+
+      expect(result.status).toBe('rejected');
+
+      // Verify getUserInfo was called with correct user ID
+      expect(mockSlack.getUserInfo).toHaveBeenCalledWith('U456');
+
+      // Verify postThreadMessage was called with correct parameters
+      expect(mockSlack.postThreadMessage).toHaveBeenCalledWith(
+        'C123',
+        '1234567890.123',
+        expect.stringMatching(/❌.*<@U456>.*拒否しました/)
+      );
     });
   });
 
@@ -369,6 +483,14 @@ describe('Release Checker Service', () => {
         ok: true,
         value: [{ name: 'ok', count: 1, users: ['U123'] }],
       });
+      vi.mocked(services.slack.getUserInfo).mockResolvedValue({
+        ok: true,
+        value: { id: 'U123', name: 'Test User' },
+      });
+      vi.mocked(services.slack.postThreadMessage).mockResolvedValue({
+        ok: true,
+        value: { channel: 'C123', timestamp: '1234567890.124' },
+      });
 
       // Mock current time to be within schedule
       const originalDate = Date;
@@ -421,6 +543,14 @@ describe('Release Checker Service', () => {
       vi.mocked(services.slack.getReactions).mockResolvedValue({
         ok: true,
         value: [{ name: 'ok', count: 1, users: ['U123'] }],
+      });
+      vi.mocked(services.slack.getUserInfo).mockResolvedValue({
+        ok: true,
+        value: { id: 'U123', name: 'Test User' },
+      });
+      vi.mocked(services.slack.postThreadMessage).mockResolvedValue({
+        ok: true,
+        value: { channel: 'C123', timestamp: '1234567890.124' },
       });
 
       // Mock current time to be within schedule

@@ -13,10 +13,20 @@ describe('SlackClient interface', () => {
         ok: true,
         value: [{ name: '+1', count: 1, users: ['U123'] }],
       }),
+      postThreadMessage: async () => ({
+        ok: true,
+        value: { channel: 'C123', timestamp: '1234567890.123457' },
+      }),
+      getUserInfo: async () => ({
+        ok: true,
+        value: { id: 'U123', name: 'Test User' },
+      }),
     };
 
     expect(typeof mockClient.postMessage).toBe('function');
     expect(typeof mockClient.getReactions).toBe('function');
+    expect(typeof mockClient.postThreadMessage).toBe('function');
+    expect(typeof mockClient.getUserInfo).toBe('function');
   });
 
   it('SlackClient.postMessage - should return message info on success', async () => {
@@ -26,6 +36,14 @@ describe('SlackClient interface', () => {
         value: { channel: 'C123', timestamp: '1234567890.123456' },
       }),
       getReactions: async () => ({ ok: true, value: [] }),
+      postThreadMessage: async () => ({
+        ok: true,
+        value: { channel: 'C123', timestamp: '1234567890.123457' },
+      }),
+      getUserInfo: async () => ({
+        ok: true,
+        value: { id: 'U123', name: 'Test User' },
+      }),
     };
 
     const result = await mockClient.postMessage('C123', 'Test message', ['U123']);
@@ -47,6 +65,14 @@ describe('SlackClient interface', () => {
           { name: '-1', count: 1, users: ['U789'] },
         ],
       }),
+      postThreadMessage: async () => ({
+        ok: true,
+        value: { channel: 'C123', timestamp: '1234567890.123457' },
+      }),
+      getUserInfo: async () => ({
+        ok: true,
+        value: { id: 'U123', name: 'Test User' },
+      }),
     };
 
     const result = await mockClient.getReactions('C123', '1234567890.123456');
@@ -65,6 +91,8 @@ describe('SlackClient interface', () => {
     const mockClient: SlackClient = {
       postMessage: async () => ({ ok: false, error }),
       getReactions: async () => ({ ok: false, error }),
+      postThreadMessage: async () => ({ ok: false, error }),
+      getUserInfo: async () => ({ ok: false, error }),
     };
 
     const postResult = await mockClient.postMessage('C123', 'Test', []);
@@ -74,6 +102,57 @@ describe('SlackClient interface', () => {
     expect(getResult.ok).toBe(false);
     if (!postResult.ok) expect(postResult.error).toBe(error);
     if (!getResult.ok) expect(getResult.error).toBe(error);
+  });
+
+  it('SlackClient.postThreadMessage - should post message to thread', async () => {
+    const mockClient: SlackClient = {
+      postMessage: async () => ({ ok: true, value: { channel: 'C123', timestamp: '123' } }),
+      getReactions: async () => ({ ok: true, value: [] }),
+      postThreadMessage: async (channel, threadTs, text) => {
+        expect(channel).toBe('C123');
+        expect(threadTs).toBe('1234567890.123456');
+        expect(text).toBe('✅ <@U123> approved the release');
+        return {
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.123457' },
+        };
+      },
+      getUserInfo: async () => ({ ok: true, value: { id: 'U123', name: 'Test User' } }),
+    };
+
+    const result = await mockClient.postThreadMessage(
+      'C123',
+      '1234567890.123456',
+      '✅ <@U123> approved the release'
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.timestamp).toBe('1234567890.123457');
+    }
+  });
+
+  it('SlackClient.getUserInfo - should return user information', async () => {
+    const mockClient: SlackClient = {
+      postMessage: async () => ({ ok: true, value: { channel: 'C123', timestamp: '123' } }),
+      getReactions: async () => ({ ok: true, value: [] }),
+      postThreadMessage: async () => ({ ok: true, value: { channel: 'C123', timestamp: '123' } }),
+      getUserInfo: async (userId) => {
+        expect(userId).toBe('U123');
+        return {
+          ok: true,
+          value: { id: 'U123', name: 'Test User' },
+        };
+      },
+    };
+
+    const result = await mockClient.getUserInfo('U123');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.id).toBe('U123');
+      expect(result.value.name).toBe('Test User');
+    }
   });
 });
 
@@ -146,6 +225,73 @@ describe('SlackWebClient', () => {
 
     expect(postResult.ok).toBe(false);
     expect(getResult.ok).toBe(false);
+  });
+
+  it('SlackWebClient.postThreadMessage - when posting to thread - should include thread_ts', async () => {
+    const mockApi: SlackApi = {
+      postMessage: vi.fn().mockResolvedValue({
+        ok: true,
+        channel: 'C123',
+        ts: '1234567890.123457',
+      }),
+      getReactions: vi.fn(),
+      postThreadMessage: vi.fn().mockResolvedValue({
+        ok: true,
+        channel: 'C123',
+        ts: '1234567890.123457',
+      }),
+      getUserInfo: vi.fn().mockResolvedValue({
+        ok: true,
+        user: {
+          id: 'U123',
+          name: 'Test User',
+        },
+      }),
+    };
+
+    const client = new SlackWebClient(mockApi);
+    const result = await client.postThreadMessage(
+      'C123',
+      '1234567890.123456',
+      '✅ <@U123> approved the release'
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.timestamp).toBe('1234567890.123457');
+    }
+
+    expect(mockApi.postThreadMessage).toHaveBeenCalledWith({
+      channel: 'C123',
+      thread_ts: '1234567890.123456',
+      text: '✅ <@U123> approved the release',
+    });
+  });
+
+  it('SlackWebClient.getUserInfo - when fetching user info - should return user details', async () => {
+    const mockApi: SlackApi = {
+      postMessage: vi.fn(),
+      getReactions: vi.fn(),
+      postThreadMessage: vi.fn(),
+      getUserInfo: vi.fn().mockResolvedValue({
+        ok: true,
+        user: {
+          id: 'U123',
+          name: 'Test User',
+        },
+      }),
+    };
+
+    const client = new SlackWebClient(mockApi);
+    const result = await client.getUserInfo('U123');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.id).toBe('U123');
+      expect(result.value.name).toBe('Test User');
+    }
+
+    expect(mockApi.getUserInfo).toHaveBeenCalledWith({ user: 'U123' });
   });
 });
 

@@ -142,6 +142,18 @@ export const waitForApproval = async (
 
       if (rejectors.length > 0) {
         logger.info('Release rejected', { rejectors });
+
+        // Post thread message with rejector info
+        const firstRejector = rejectors[0];
+        const userInfoResult = await slack.getUserInfo(firstRejector);
+        const userName = userInfoResult.ok ? userInfoResult.value.name : 'Unknown User';
+
+        await slack.postThreadMessage(
+          channelId,
+          messageTimestamp,
+          `❌ <@${firstRejector}> (${userName}) が拒否しました`
+        );
+
         return { status: 'rejected', approvers: rejectors };
       }
     }
@@ -155,6 +167,18 @@ export const waitForApproval = async (
 
       if (approvers.length > 0) {
         logger.info('Release approved', { approvers });
+
+        // Post thread message with approver info
+        const firstApprover = approvers[0];
+        const userInfoResult = await slack.getUserInfo(firstApprover);
+        const userName = userInfoResult.ok ? userInfoResult.value.name : 'Unknown User';
+
+        await slack.postThreadMessage(
+          channelId,
+          messageTimestamp,
+          `✅ <@${firstApprover}> (${userName}) が承認しました`
+        );
+
         return { status: 'approved', approvers };
       }
     }
