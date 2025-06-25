@@ -188,6 +188,14 @@ export const waitForApproval = async (
   }
 
   logger.info('Approval polling timed out');
+
+  // Post timeout message to thread
+  await slack.postThreadMessage(
+    channelId,
+    messageTimestamp,
+    `⏱️ ${waitMinutes}分間応答がなかったため、リリースリクエストがタイムアウトしました`
+  );
+
   return { status: 'timeout' };
 };
 

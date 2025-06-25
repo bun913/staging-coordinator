@@ -313,6 +313,41 @@ describe('Release Checker Service', () => {
       expect(result.status).toBe('timeout');
     });
 
+    it('waitForApproval - when timeout occurs - posts thread message', async () => {
+      const mockSlack = {
+        postMessage: vi.fn(),
+        getReactions: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [],
+        }),
+        postThreadMessage: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { channel: 'C123', timestamp: '1234567890.124' },
+        }),
+        getUserInfo: vi.fn(),
+      } as unknown as SlackClient;
+
+      const result = await waitForApproval(
+        mockSlack,
+        'C123',
+        '1234567890.123',
+        ['U999'],
+        'ok',
+        '-1',
+        0.001, // Very short timeout (0.06 seconds)
+        10 // Very short poll interval (10ms) for fast test
+      );
+
+      expect(result.status).toBe('timeout');
+
+      // Verify postThreadMessage was called with timeout message
+      expect(mockSlack.postThreadMessage).toHaveBeenCalledWith(
+        'C123',
+        '1234567890.123',
+        expect.stringMatching(/⏱️.*0\.001.*分間応答がなかったため.*タイムアウトしました/)
+      );
+    });
+
     it('waitForApproval - when approval reaction found - posts thread message with approver name', async () => {
       const mockSlack = {
         postMessage: vi.fn(),

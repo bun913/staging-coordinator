@@ -66,14 +66,19 @@ Proceeding with release for availability.
 
 These messages would be posted as thread replies to the original release request message.
 
-### Approval Message (To be implemented):
+### Approval Message:
 ```
-✅ <@{approverUserId}> approved the release
+✅ <@{approverUserId}> ({userName}) が承認しました
 ```
 
-### Rejection Message (To be implemented):
+### Rejection Message:
 ```
-❌ <@{rejectorUserId}> rejected the release
+❌ <@{rejectorUserId}> ({userName}) が拒否しました
+```
+
+### Timeout Message:
+```
+⏱️ {waitMinutes}分間応答がなかったため、リリースリクエストがタイムアウトしました
 ```
 
 ### Example Thread:
