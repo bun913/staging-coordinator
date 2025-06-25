@@ -12,16 +12,15 @@ import type { Schedule } from '../../../src/lib/types';
 
 describe('Basic Date Operations', () => {
   describe('getCurrentDateTime', () => {
-    it('getCurrentDateTime - when timezone provided - returns date in specified timezone', () => {
+    it('getCurrentDateTime - when timezone provided - returns date adjusted for timezone', () => {
       const result = getCurrentDateTime('Asia/Tokyo');
 
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toBeInstanceOf(Date);
-        // Check that it's a valid recent date (within last minute)
-        const now = new Date();
-        const diff = Math.abs(now.getTime() - result.value.getTime());
-        expect(diff).toBeLessThan(60000); // Within 1 minute
+        // The returned date should be a valid Date object
+        // We can't check exact time since it's timezone-adjusted, but should be reasonable
+        expect(result.value.getFullYear()).toBeGreaterThan(2020);
       }
     });
 
@@ -31,6 +30,38 @@ describe('Basic Date Operations', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.message).toContain('Invalid timezone');
+      }
+    });
+
+    it('getCurrentDateTime - when UTC timezone specified - returns current UTC time', () => {
+      // Test with UTC to verify basic functionality
+      const result = getCurrentDateTime('UTC');
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toBeInstanceOf(Date);
+
+        // For UTC, the returned time should be close to current time
+        const now = new Date();
+        const diff = Math.abs(now.getTime() - result.value.getTime());
+        expect(diff).toBeLessThan(60000); // Within 1 minute
+      }
+    });
+
+    it('getCurrentDateTime - when Asia/Tokyo timezone - returns UTC time adjusted for JST offset', () => {
+      // Test with Asia/Tokyo (UTC+9) to verify timezone offset is applied correctly
+      const result = getCurrentDateTime('Asia/Tokyo');
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toBeInstanceOf(Date);
+
+        // The returned Date should be current UTC time + JST offset (9 hours)
+        // Compare with current UTC time to verify the offset
+        const utcNow = new Date();
+        const diffInHours = (result.value.getTime() - utcNow.getTime()) / (1000 * 60 * 60);
+
+        expect(diffInHours).toBeCloseTo(9, 1);
       }
     });
   });

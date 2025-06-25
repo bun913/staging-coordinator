@@ -73,7 +73,7 @@ Options:
                              Environment: APPROVE_REACTION
   --reject-reaction         Rejection reaction emoji (default: -1)
                              Environment: REJECT_REACTION
-  --timezone                Timezone (default: Asia/Tokyo)
+  --timezone                Timezone (required, e.g., UTC, Asia/Tokyo)
                              Environment: TIMEZONE
   -h, --help                Show this help message
 
@@ -100,11 +100,12 @@ Note: All options can be set via environment variables or .env file.
     values['slack-token'] || process.env.SLACK_TOKEN || process.env.SLACK_BOT_TOKEN;
   const spreadsheetId =
     values['spreadsheet-id'] || process.env.SPREADSHEET_ID || process.env.GOOGLE_SPREADSHEET_ID;
+  const timezone = values.timezone || process.env.TIMEZONE;
 
-  if (!slackChannelId || !sheetsCredentialsPath || !slackToken || !spreadsheetId) {
+  if (!slackChannelId || !sheetsCredentialsPath || !slackToken || !spreadsheetId || !timezone) {
     console.error('Error: Missing required options');
     console.error(
-      'Required: --slack-channel-id (or SLACK_CHANNEL_ID), --sheets-credentials (or SHEETS_CREDENTIALS_PATH/GOOGLE_SERVICE_ACCOUNT_JSON), --slack-token (or SLACK_TOKEN/SLACK_BOT_TOKEN), --spreadsheet-id (or SPREADSHEET_ID/GOOGLE_SPREADSHEET_ID)'
+      'Required: --slack-channel-id (or SLACK_CHANNEL_ID), --sheets-credentials (or SHEETS_CREDENTIALS_PATH/GOOGLE_SERVICE_ACCOUNT_JSON), --slack-token (or SLACK_TOKEN/SLACK_BOT_TOKEN), --spreadsheet-id (or SPREADSHEET_ID/GOOGLE_SPREADSHEET_ID), --timezone (or TIMEZONE)'
     );
     process.exit(1);
   }
@@ -129,7 +130,7 @@ Note: All options can be set via environment variables or .env file.
         : 20,
     approveReaction: values['approve-reaction'] || process.env.APPROVE_REACTION || 'ok',
     rejectReaction: values['reject-reaction'] || process.env.REJECT_REACTION || '-1',
-    timezone: values.timezone || process.env.TIMEZONE || 'Asia/Tokyo',
+    timezone: timezone as string,
   };
 };
 

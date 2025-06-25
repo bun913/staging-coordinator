@@ -2,6 +2,12 @@ import type { Result } from './result';
 import { ok, err } from './result';
 import { ValidationError } from './errors';
 import type { Schedule } from '../lib/types';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export enum ScheduleStatus {
   NOT_STARTED = 'NOT_STARTED',
@@ -12,14 +18,22 @@ export enum ScheduleStatus {
 /**
  * Get current date and time in specified timezone
  */
-export const getCurrentDateTime = (timezone: string): Result<Date> => {
+export const getCurrentDateTime = (timezoneStr: string): Result<Date> => {
   try {
-    // Validate timezone by attempting to create a formatter
-    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    // Get current time in specified timezone using dayjs
+    const now = dayjs.tz(dayjs(), timezoneStr);
 
-    return ok(new Date());
+    // Get the UTC offset in minutes for the specified timezone
+    const offsetMinutes = now.utcOffset();
+
+    // Create a UTC Date and adjust it by the timezone offset
+    // This ensures schedule comparisons work correctly with the adjusted time
+    const utcNow = dayjs.utc();
+    const adjustedUtcTime = utcNow.add(offsetMinutes, 'minute');
+
+    return ok(adjustedUtcTime.toDate());
   } catch (_error) {
-    return err(new ValidationError(`Invalid timezone: ${timezone}`, { field: 'timezone' }));
+    return err(new ValidationError(`Invalid timezone: ${timezoneStr}`, { field: 'timezone' }));
   }
 };
 
